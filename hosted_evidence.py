@@ -533,11 +533,15 @@ def _find_amount(text: str) -> float | None:
             return _sane_amount(float(mt.group(1).replace(",", "")))
         except Exception:
             pass
-    # 2. Fallback: first bare number that is NOT a 12-digit UTR run.
+    # 2. Fallback: first bare number that is neither a 12-digit UTR nor a
+    #    duration ("3 days ago") nor a count of attempts ("paid 2 times").
     for m in re.finditer(r"\b([\d,]+(?:\.\d+)?)\b", text or ""):
         raw = m.group(1).replace(",", "")
         if re.fullmatch(r"\d{12}", raw):
             continue  # UTR, not an amount
+        tail = (text or "")[m.end():m.end() + 12].lower()
+        if re.match(r"\s*(days?|hours?|hrs?|mins?|minutes?|weeks?|months?|years?|times?|attempts?)\b", tail):
+            continue  # duration / count, not money
         try:
             return _sane_amount(float(raw))
         except Exception:
