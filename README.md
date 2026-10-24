@@ -10,10 +10,10 @@ Fetch.ai-native multi-agent payment dispute resolver. Working ASI:One interface,
 ## Agents
 - `PayResolve` (agents/orchestrator.py, port 8001) — public ACP entry, Interactive Cards
   - live address: `agent1q0vj3x8sjdvvpv0elvd0rr60umhkeva8kd9w49pcdqh9zw67wxxrk6yvda6` (your `AGENT_SEED`)
-- `payresolve-triage` (port 8002) — dev address: `agent1qgxex2xv5834jh7hsec0e9xjcgmvhur8rz9fj9dcquvawdwn30q665cf45e`
-- `payresolve-policy` (port 8003) — dev address: `agent1q099ulyv0l4wvlgztyl82qe927rtpc8cp56lm0klhawa7zk0entdy3u9767`
-- `payresolve-evidence` (port 8004) — dev address: `agent1qwzmerm3xkwrkwscqynudmwjgg4ayzmhrmlknrhazgal9c6sttyaxztrq25`
-- NOTE: dev-seed addresses; your `AGENT_SEED` / `TRIBUTE_SEED` / `POLICY_SEED` / `EVIDENCE_SEED` will change these.
+- `payresolve-triage` (port 8002) — live address: `agent1qwd7l7jv9fzpkej7nq4c8wjxfs8vgw9unddst5q08076yn92k5uy5l043dq`
+- `payresolve-policy` (port 8003) — live address: `agent1qggnj3j4jvz9su2eefhf7l9rprjsccjphjxdan77wmahe9tgtmz5yxppwr7`
+- `payresolve-evidence` (port 8004) — live address: `agent1qvnrqea7eflv2my3szqtn2jdq82uu7dspuguzdgvmnpqf2c2nx70qxd5u79`
+- NOTE: live-seed addresses; keep agents running for ASI:One discovery.
 
 ## Run
 ```
