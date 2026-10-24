@@ -1099,10 +1099,10 @@ async def on_message(ctx: Context, sender: str, msg: ChatMessage):
 
     if not last or _is_greeting(last):
         await ctx.send(sender, card_message(
-            "Welcome to PayResolve. Tell me what happened, or fill the intake form.",
+            "Welcome to PayResolve. Tell me what happened in a sentence, or fill the form. "
+            "Note: failed, pending and unauthorised are different tracks — I check policy before recommending.",
             "form", intake_form(),
         ))
-        await ctx.send(sender, _text("Tip: failed ≠ pending ≠ unauthorised. I check policy before recommending."))
         return
 
     sel = parse_selection(last)
