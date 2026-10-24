@@ -6,10 +6,25 @@ judges can be shown "Case ab12-20261024 — Day N".
 from __future__ import annotations
 import os
 import sqlite3
+import tempfile
 from datetime import datetime, timezone
 
-_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_PATH = os.getenv("CASES_DB") or os.path.join(_REPO_ROOT, "payresolve_cases.db")
+
+def _default_db_path() -> str:
+    """Prefer the repo dir; fall back to a temp dir on read-only filesystems
+    (e.g. Agentverse hosted agents) instead of failing at import."""
+    try:
+        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        probe = os.path.join(repo_root, ".write_probe")
+        with open(probe, "w", encoding="utf-8") as fh:
+            fh.write("ok")
+        os.remove(probe)
+        return os.path.join(repo_root, "payresolve_cases.db")
+    except Exception:
+        return os.path.join(tempfile.gettempdir(), "payresolve_cases.db")
+
+
+DB_PATH = os.getenv("CASES_DB") or _default_db_path()
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS cases (

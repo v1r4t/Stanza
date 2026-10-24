@@ -27,6 +27,29 @@ python -m agents.orchestrator
 ```
 Connect via Agentverse mailbox inspector, then chat via ASI:One (@mention). Cards: intake form → carousel → review pack.
 
+## Always-on hosting (no laptop needed)
+
+Agentverse's Build tab takes a single script, so `scripts/build_hosted.py` flattens
+`core/` + `agents/` into four paste-ready bundles:
+
+```
+python scripts/build_hosted.py   # writes hosted_{payresolve,triage,policy,evidence}.py
+```
+
+Rerun after **every** source change (tests fail if bundles go stale). Never hand-edit bundles.
+
+Deploy order in Agentverse → Agents → Launch an Agent → Generate/blank agent → Build tab:
+
+1. Paste `hosted_triage.py`, Start, copy its address. Repeat for `hosted_policy.py`, `hosted_evidence.py`.
+2. Paste `hosted_payresolve.py` with env vars:
+   - `TRIAGE_AGENT_ADDRESS`, `POLICY_AGENT_ADDRESS`, `EVIDENCE_AGENT_ADDRESS` = the three hosted addresses from step 1
+   - `AGENT_SEED` + `TRIBUTE_SEED` + `POLICY_SEED` + `EVIDENCE_SEED` (unique, stable)
+   - `ASI1_API_KEY` (optional — deterministic fallback works without it)
+3. Start it, then `@PayResolve` in ASI:One.
+
+Hosted agents stay up without your machine. SQLite cases fall back to a temp dir when the
+filesystem is read-only, so drafting still works.
+
 ## LangChain for uAgents — yes
 Two supported patterns (docs: `uagents-adapter-guide`):
 1. Lightweight (implemented in `core/langchain_triage.py`): `ChatOpenAI(base_url="https://api.asi1.ai/v1", model="asi1-mini")` inside handler. Deterministic `core/policy_rules.py` remains guardrail so tests pass offline.
