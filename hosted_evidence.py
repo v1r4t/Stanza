@@ -772,12 +772,17 @@ evidence_agent = Agent(
     network="testnet",
 )
 
-fund_agent_if_low(str(evidence_agent.wallet.address()))
+try:
+    fund_agent_if_low(str(evidence_agent.wallet.address()))
+except Exception as _e:
+    print(f"[setup] skipping testnet funding: {_e}")
 
 
 @evidence_agent.on_event("startup")
 async def _log_address(ctx: Context):
-    ctx.logger.info(f"[startup] {evidence_agent.name} ADDRESS={evidence_agent.address}")
+    _name = getattr(evidence_agent, "name", "payresolve-evidence")
+    _addr = getattr(evidence_agent, "address", "unknown")
+    ctx.logger.info(f"[startup] {_name} ADDRESS={_addr}")
 evidence_proto = Protocol("payresolve-evidence")
 
 

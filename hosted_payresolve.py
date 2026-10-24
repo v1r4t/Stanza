@@ -904,14 +904,20 @@ agent = Agent(
     network="testnet",
 )
 
-fund_agent_if_low(str(agent.wallet.address()))
+try:
+    fund_agent_if_low(str(agent.wallet.address()))
+except Exception as _e:  # hosted wrapper may not expose .wallet
+    print(f"[setup] skipping testnet funding: {_e}")
 
 
 @agent.on_event("startup")
 async def _log_address(ctx: Context):
     """Print our own address so hosted deployments (where the dashboard
-    overrides our seed) can be wired up from the log panel."""
-    ctx.logger.info(f"[startup] {agent.name} ADDRESS={agent.address}")
+    overrides our seed and wraps the agent object) can be wired from logs.
+    getattr guards: the hosted wrapper may not expose .name/.address."""
+    _name = getattr(agent, "name", "PayResolve")
+    _addr = getattr(agent, "address", "unknown")
+    ctx.logger.info(f"[startup] {_name} ADDRESS={_addr}")
 
 chat_proto = Protocol(spec=chat_protocol_spec)
 

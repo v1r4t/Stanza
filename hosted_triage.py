@@ -779,12 +779,17 @@ triage_agent = Agent(
     network="testnet",
 )
 
-fund_agent_if_low(str(triage_agent.wallet.address()))
+try:
+    fund_agent_if_low(str(triage_agent.wallet.address()))
+except Exception as _e:
+    print(f"[setup] skipping testnet funding: {_e}")
 
 
 @triage_agent.on_event("startup")
 async def _log_address(ctx: Context):
-    ctx.logger.info(f"[startup] {triage_agent.name} ADDRESS={triage_agent.address}")
+    _name = getattr(triage_agent, "name", "payresolve-triage")
+    _addr = getattr(triage_agent, "address", "unknown")
+    ctx.logger.info(f"[startup] {_name} ADDRESS={_addr}")
 
 triage_proto = Protocol("payresolve-triage")
 

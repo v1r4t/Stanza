@@ -19,12 +19,17 @@ policy_agent = Agent(
     network="testnet",
 )
 
-fund_agent_if_low(str(policy_agent.wallet.address()))
+try:
+    fund_agent_if_low(str(policy_agent.wallet.address()))
+except Exception as _e:
+    print(f"[setup] skipping testnet funding: {_e}")
 
 
 @policy_agent.on_event("startup")
 async def _log_address(ctx: Context):
-    ctx.logger.info(f"[startup] {policy_agent.name} ADDRESS={policy_agent.address}")
+    _name = getattr(policy_agent, "name", "payresolve-policy")
+    _addr = getattr(policy_agent, "address", "unknown")
+    ctx.logger.info(f"[startup] {_name} ADDRESS={_addr}")
 policy_proto = Protocol("payresolve-policy")
 
 
