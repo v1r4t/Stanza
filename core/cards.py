@@ -46,12 +46,12 @@ def intake_form():
 
 def track_carousel():
     return {
-        "title": "Which track matches?",
-        "subtitle": "NPCI distinguishes these",
+        "title": "Which one matches your situation?",
+        "subtitle": "Pick the closest — each path handles your money differently",
         "items": [
-            {"id": "failed", "title": "Failed debit", "subtitle": "Debited not credited", "badges": [{"label": "reversal TAT", "variant": "info"}], "secondary_text": "Check PSP window", "primary_cta": {"label": "Failed", "selection": {"action": "pick_track", "track": "failed"}}},
-            {"id": "pending", "title": "Pending", "subtitle": "Processing", "badges": [{"label": "wait", "variant": "warning"}], "secondary_text": "Status check", "primary_cta": {"label": "Pending", "selection": {"action": "pick_track", "track": "pending"}}},
-            {"id": "unauthorised", "title": "Unauthorised", "subtitle": "Possible fraud", "badges": [{"label": "report now", "variant": "warning"}], "secondary_text": "Block plus report", "primary_cta": {"label": "Unauthorised", "selection": {"action": "pick_track", "track": "unauthorised"}}},
+            {"id": "failed", "title": "I paid, but they didn't get it", "subtitle": "Money left my account; merchant not credited", "badges": [{"label": "Usually auto-refunds", "variant": "success"}], "secondary_text": "No need to panic yet", "primary_cta": {"label": "This is my case", "selection": {"action": "pick_track", "track": "failed"}}},
+            {"id": "pending", "title": "Still showing 'processing'", "subtitle": "App hasn't confirmed success or failure", "badges": [{"label": "Wait — don't pay again", "variant": "warning"}], "secondary_text": "A second payment can double-charge you", "primary_cta": {"label": "This is my case", "selection": {"action": "pick_track", "track": "pending"}}},
+            {"id": "unauthorised", "title": "I didn't make this payment", "subtitle": "Someone else may have used my account", "badges": [{"label": "Act today", "variant": "warning"}], "secondary_text": "Block the account, then report", "primary_cta": {"label": "This is my case", "selection": {"action": "pick_track", "track": "unauthorised"}}},
         ],
     }
 

@@ -167,7 +167,7 @@ async def on_message(ctx: Context, sender: str, msg: ChatMessage):
     # Step 1: show classification carousel for confirmation if unknown/low-confidence
     if triage.transaction_type.value == "unknown":
         await ctx.send(sender, card_message(
-            "I couldn't classify this yet — which matches? (failed / pending / unauthorised are different tracks)",
+            "I couldn't tell which situation this is — pick the closest one below.",
             "carousel", track_carousel(),
         ))
         return
