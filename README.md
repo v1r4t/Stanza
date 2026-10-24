@@ -78,7 +78,7 @@ Two supported patterns (docs: `uagents-adapter-guide`):
 
 ## Submission
 - Agentverse agent profile: `https://agentverse.ai/agents/profile?address=agent1qw2ex8clxmdawmj4sfjdjmpskhv7revadhx7dc6tu9k0967t3x8aggg6a28p`
-- ASI:One shared chat URL: https://asi1.ai/chat/89c9d6ee-f1f9-4314-94e3-fc0d9597ba11?from=profile&handle=blank-agent-870
+- ASI:One shared chat URL: https://asi1.ai/chat/89c9d6ee-f1f9-4314-94e3-fc0d9597ba11
 - Demo video (3-5 min): _
 - Dashboard: ASI:One Fetch-A-Thon 3.0 → Project Submission Agent
 
