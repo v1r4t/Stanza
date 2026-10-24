@@ -851,6 +851,28 @@ def parse_selection(text):
     return sel
 
 
+def build_detail(sel: dict, last: str) -> str:
+    """Compose the text handed to triage from a card selection.
+
+    CRITICAL: the raw user message is always appended. A selection can carry
+    only a track (inferred from keywords), so dropping `last` would lose the
+    UTR, amount and date that live in the sentence itself.
+    """
+    last = last or ""
+    if not (sel.get("action") in {"intake_submit", "pick_track"} or "track" in sel or "status" in sel):
+        return last
+    track = sel.get("track") or sel.get("status") or ""
+    parts = [
+        str(track),
+        f"amount={sel.get('amount', '')}",
+        f"utr={sel.get('utr', '')}",
+        str(sel.get("details", "")),
+        str(track),
+        last,
+    ]
+    return " ".join(p for p in parts if p).strip()
+
+
 # ===== agents/orchestrator.py (flattened) =====
 """PayResolve orchestrator — public ACP entry point.
 
@@ -1119,17 +1141,8 @@ async def on_message(ctx: Context, sender: str, msg: ChatMessage):
             "form", intake_form(),
         ))
         return
-    # intake form submit or track pick carries JSON
-    if sel.get("action") in {"intake_submit", "pick_track"} or "track" in sel or "status" in sel:
-        _track = sel.get("track") or sel.get("status") or ""
-        detail = (
-            f"{_track} amount={sel.get('amount','')} utr={sel.get('utr','')} "
-            f"{sel.get('details','')} {_track}"
-        )
-        if _track in {"failed", "pending", "unauthorised"}:
-            sel.setdefault("track", _track)
-    else:
-        detail = last
+    # intake form submit / track pick JSON, otherwise the raw message
+    detail = build_detail(sel, last)
 
     # Merge follow-up details into the pending case (one-shot): if the last
     # turn asked for missing fields, combine rather than starting over.

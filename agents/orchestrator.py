@@ -27,7 +27,7 @@ from uagents_core.contrib.protocols.chat import (
     chat_protocol_spec,
 )
 
-from core.cards import card_message, intake_form, track_carousel, review_pack, parse_selection
+from core.cards import card_message, intake_form, track_carousel, review_pack, parse_selection, build_detail
 from core.resolution import triage_text, policy_for, build_pack, elaborate_assessment
 from core.security import redact
 from core.schemas import TransactionType, TriageResult, PolicyFinding, EvidencePack
@@ -276,17 +276,8 @@ async def on_message(ctx: Context, sender: str, msg: ChatMessage):
             "form", intake_form(),
         ))
         return
-    # intake form submit or track pick carries JSON
-    if sel.get("action") in {"intake_submit", "pick_track"} or "track" in sel or "status" in sel:
-        _track = sel.get("track") or sel.get("status") or ""
-        detail = (
-            f"{_track} amount={sel.get('amount','')} utr={sel.get('utr','')} "
-            f"{sel.get('details','')} {_track}"
-        )
-        if _track in {"failed", "pending", "unauthorised"}:
-            sel.setdefault("track", _track)
-    else:
-        detail = last
+    # intake form submit / track pick JSON, otherwise the raw message
+    detail = build_detail(sel, last)
 
     # Merge follow-up details into the pending case (one-shot): if the last
     # turn asked for missing fields, combine rather than starting over.

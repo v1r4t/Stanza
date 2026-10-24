@@ -90,3 +90,25 @@ def parse_selection(text):
         if key in low:
             sel["action"] = key
     return sel
+
+
+def build_detail(sel: dict, last: str) -> str:
+    """Compose the text handed to triage from a card selection.
+
+    CRITICAL: the raw user message is always appended. A selection can carry
+    only a track (inferred from keywords), so dropping `last` would lose the
+    UTR, amount and date that live in the sentence itself.
+    """
+    last = last or ""
+    if not (sel.get("action") in {"intake_submit", "pick_track"} or "track" in sel or "status" in sel):
+        return last
+    track = sel.get("track") or sel.get("status") or ""
+    parts = [
+        str(track),
+        f"amount={sel.get('amount', '')}",
+        f"utr={sel.get('utr', '')}",
+        str(sel.get("details", "")),
+        str(track),
+        last,
+    ]
+    return " ".join(p for p in parts if p).strip()
