@@ -115,6 +115,20 @@ async def on_message(ctx: Context, sender: str, msg: ChatMessage):
         except Exception:
             saved = {}
         draft = saved.get("draft") if isinstance(saved, dict) else None
+        # Rebuild fresh from the stored report so template upgrades and any
+        # merged details always apply — never serve a stale stored draft.
+        try:
+            if isinstance(saved, dict) and saved.get("report"):
+                fresh = triage_text(saved["report"])
+                if fresh.transaction_type.value == "unknown" and saved.get("track") in {"failed", "pending", "unauthorised"}:
+                    from core.schemas import TransactionType
+                    fresh.transaction_type = TransactionType(saved["track"])
+                fresh_pack = build_pack(fresh, policy_for(fresh))
+                draft = fresh_pack.complaint_draft
+                saved["draft"] = draft
+                ctx.storage.set(sender, saved)
+        except Exception:
+            pass
         if draft:
             await ctx.send(sender, _text(
                 "Here is your complaint draft — copy, fill the [brackets], and send it to your bank/PSP:\n\n" + draft
