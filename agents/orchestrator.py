@@ -164,8 +164,35 @@ async def on_message(ctx: Context, sender: str, msg: ChatMessage):
     policy = policy_for(triage)
     pack = build_pack(triage, policy)
 
-    # Step 1: show classification carousel for confirmation if unknown/low-confidence
+    # Step 1: show classification carousel for confirmation if unknown/low-confidence.
+    # But if a case is already open and this message carries no NEW UTR, it is
+    # a follow-up on that case — recap instead of restarting from step 1.
     if triage.transaction_type.value == "unknown":
+        try:
+            saved = ctx.storage.get(sender) or {}
+        except Exception:
+            saved = {}
+        if not isinstance(saved, dict):
+            saved = {}
+        if triage.utr and saved.get("utr") and triage.utr != saved.get("utr"):
+            try:
+                ctx.storage.set(sender, {})
+            except Exception:
+                pass
+            saved = {}
+        if saved.get("track") in {"failed", "pending", "unauthorised"}:
+            utr_bit = f" (UTR …{saved['utr'][-4:]})" if saved.get("utr") else ""
+            amt_bit = ""
+            try:
+                amt_bit = f" of Rs {saved['amount']:g}" if saved.get("amount") is not None else ""
+            except Exception:
+                pass
+            await ctx.send(sender, _text(
+                f"Still on your {saved['track']} case{utr_bit}{amt_bit}. "
+                "Ask me anything about it — tap Generate complaint draft on the review card "
+                "when ready, or say 'start over' for a new case."
+            ))
+            return
         await ctx.send(sender, card_message(
             "I couldn't tell which situation this is — pick the closest one below.",
             "carousel", track_carousel(),

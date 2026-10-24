@@ -74,6 +74,8 @@ def parse_selection(text):
         pass
     low = (text or "").lower()
     sel = {}
+    if "start over" in low or "new case" in low or "restart" in low:
+        sel["action"] = "cancel"
     if "unauthor" in low or "fraud" in low:
         sel["track"] = "unauthorised"
     elif "pending" in low or "processing" in low:
