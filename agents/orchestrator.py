@@ -25,7 +25,7 @@ from uagents_core.contrib.protocols.chat import (
 )
 
 from core.cards import card_message, intake_form, track_carousel, review_pack, parse_selection
-from core.resolution import triage_text, policy_for, build_pack
+from core.resolution import triage_text, policy_for, build_pack, elaborate_assessment
 from core.security import redact
 
 load_dotenv()
@@ -122,18 +122,9 @@ async def on_message(ctx: Context, sender: str, msg: ChatMessage):
         ))
         return
 
-    llm_note = _asi1_reply(f"Summarise in 2 lines: track={triage.transaction_type.value}, urgency={triage.urgency}, report={redact(detail)[:500]}")
-    summary = llm_note or f"Track: {triage.transaction_type.value} | Urgency: {triage.urgency} | Refund guaranteed: False"
-
-    rows = [
-        {"label": "Track", "value": triage.transaction_type.value},
-        {"label": "UTR", "value": triage.utr or "missing"},
-        {"label": "Amount", "value": str(triage.amount) if triage.amount is not None else "missing"},
-        {"label": "Next", "value": ", ".join(policy.timelines[:2])},
-        {"label": "Note", "value": summary[:120]},
-    ]
+    narration, rows = elaborate_assessment(triage, policy)
     await ctx.send(sender, card_message(
-        f"Assessment: {summary}. Review the pack — I cite official sources, never promise refunds.",
+        narration + " I cite official sources and never promise refunds.",
         "review",
         review_pack(rows, {"action": "confirm_pack"}, {"action": "cancel"}),
     ))
