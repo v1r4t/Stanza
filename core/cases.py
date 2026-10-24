@@ -33,10 +33,16 @@ def _conn() -> sqlite3.Connection:
     return cx
 
 
-def case_id_for(utr: str | None, occurred_on: str | None) -> str:
+def case_id_for(utr: str | None, occurred_on: str | None, report: str = "") -> str:
     day = (occurred_on or "")[:10] or datetime.now(timezone.utc).date().isoformat()
     day = day.replace("-", "")
-    return f"{utr or 'noid'}-{day}"
+    if utr:
+        return f"{utr}-{day}"
+    # No UTR: derive a stable suffix from the report so two distinct
+    # same-day cases don't collide, while the same case stays stable.
+    import hashlib
+    digest = hashlib.sha256((report or "").strip().lower().encode()).hexdigest()[:8]
+    return f"noid-{digest}-{day}"
 
 
 def short_ref(utr: str | None, occurred_on: str | None) -> str:

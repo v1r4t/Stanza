@@ -7,12 +7,15 @@ Docs used:
 - uagents-adapter-guide (LangChain inside handler + optional Adapter publish)
 """
 from __future__ import annotations
-import json
+import asyncio
 import os
 from datetime import datetime, timezone
 from uuid import uuid4
 
 from dotenv import load_dotenv
+
+load_dotenv()  # must run before any os.getenv below
+
 from uagents import Agent, Context, Protocol
 from uagents.setup import fund_agent_if_low
 from uagents_core.contrib.protocols.chat import (
@@ -42,9 +45,8 @@ EVIDENCE_AGENT_ADDRESS = os.getenv(
     "EVIDENCE_AGENT_ADDRESS",
     "agent1qvnrqea7eflv2my3szqtn2jdq82uu7dspuguzdgvmnpqf2c2nx70qxd5u79",
 )
-_DELEGATE_TIMEOUT_S = int(os.getenv("DELEGATE_TIMEOUT_S", "25"))
+_DELEGATE_TIMEOUT_S = int(os.getenv("DELEGATE_TIMEOUT_S", "10"))
 
-load_dotenv()
 SEED = os.getenv("AGENT_SEED", "payresolve-dev-seed-do-not-use-in-prod")
 
 agent = Agent(
@@ -77,26 +79,6 @@ _MISSING_LABEL = {
     "utr_or_date": "the UTR or transaction date",
     "bank acknowledgement + cybercrime ref (1930 / cybercrime.gov.in)": "your bank's acknowledgement / cybercrime reference (call 1930)",
 }
-
-
-def _asi1_reply(prompt: str) -> str | None:
-    key = os.getenv("ASI1_API_KEY") or os.getenv("ASI_ONE_API_KEY")
-    if not key:
-        return None
-    try:
-        from openai import OpenAI
-        client = OpenAI(base_url="https://api.asi1.ai/v1", api_key=key)
-        r = client.chat.completions.create(
-            model=os.getenv("ASI1_MODEL", "asi1-mini"),
-            messages=[
-                {"role": "system", "content": "You are PayResolve intake. Be concise. Never promise refunds. Preserve failed/pending/unauthorised distinction."},
-                {"role": "user", "content": prompt[:2000]},
-            ],
-            max_tokens=300,
-        )
-        return (r.choices[0].message.content or "").strip()
-    except Exception:
-        return None
 
 
 async def _delegate_triage(ctx: Context, detail: str) -> tuple[TriageResult, bool]:
@@ -218,7 +200,10 @@ async def on_message(ctx: Context, sender: str, msg: ChatMessage):
         # Prefer the persisted SQLite case (survives restarts).
         try:
             if saved.get("case_id"):
-                row = get_case(saved["case_id"])
+                try:
+                    row = await asyncio.to_thread(get_case, saved["case_id"])
+                except Exception:
+                    row = None
                 if row:
                     draft = row.get("draft") or draft
                     report = row.get("report") or report
@@ -290,11 +275,8 @@ async def on_message(ctx: Context, sender: str, msg: ChatMessage):
         triage.urgency = "high" if sel["track"] == "unauthorised" else triage.urgency
 
     policy, _policy_live = await _delegate_policy(ctx, triage)
-    pack, _evidence_live = await _delegate_evidence(ctx, triage, detail, policy)
-    if pack is None:
-        pack = build_pack(triage, policy)
 
-    # Step 1: show classification carousel for confirmation if unknown/low-confidence.
+    # Unknown → ask which track before paying for evidence assembly.
     # But if a case is already open and this message carries no NEW UTR, it is
     # a follow-up on that case — recap instead of restarting from step 1.
     if triage.transaction_type.value == "unknown":
@@ -329,7 +311,11 @@ async def on_message(ctx: Context, sender: str, msg: ChatMessage):
         ))
         return
 
-    cid = case_id_for(triage.utr, triage.occurred_on)
+    pack, _evidence_live = await _delegate_evidence(ctx, triage, detail, policy)
+    if pack is None:
+        pack = build_pack(triage, policy)
+
+    cid = case_id_for(triage.utr, triage.occurred_on, detail)
     day_n = triage.days_elapsed + 1 if triage.days_elapsed is not None else None
     case_label = f"Case {short_ref(triage.utr, triage.occurred_on)}" + (f" · Day {day_n}" if day_n else "")
     narration, rows = elaborate_assessment(triage, policy, case_ref=case_label)
@@ -353,8 +339,10 @@ async def on_message(ctx: Context, sender: str, msg: ChatMessage):
     except Exception:
         pass
     try:
-        save_case(cid, sender, triage.transaction_type.value, triage.utr,
-                  triage.amount, pack.complaint_draft, detail)
+        await asyncio.to_thread(
+            save_case, cid, sender, triage.transaction_type.value, triage.utr,
+            triage.amount, pack.complaint_draft, detail,
+        )
     except Exception as e:
         ctx.logger.warning(f"[cases] persist failed: {e}")
     if missing:
