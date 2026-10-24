@@ -53,6 +53,16 @@ def _text(text: str) -> ChatMessage:
     )
 
 
+_MISSING_LABEL = {
+    "utr": "the 12-digit UTR from your payment history",
+    "amount": "the amount in INR",
+    "details": "a one-line description (date, app, merchant)",
+    "status": "what your app shows (failed, pending, or processing)",
+    "utr_or_date": "the UTR or transaction date",
+    "bank acknowledgement + cybercrime ref (1930 / cybercrime.gov.in)": "your bank's acknowledgement / cybercrime reference (call 1930)",
+}
+
+
 def _asi1_reply(prompt: str) -> str | None:
     key = os.getenv("ASI1_API_KEY") or os.getenv("ASI_ONE_API_KEY")
     if not key:
@@ -130,6 +140,20 @@ async def on_message(ctx: Context, sender: str, msg: ChatMessage):
     else:
         detail = last
 
+    # Merge follow-up details into the pending case (one-shot): if the last
+    # turn asked for missing fields, combine rather than starting over.
+    try:
+        prev = ctx.storage.get(sender) or {}
+    except Exception:
+        prev = {}
+    if isinstance(prev, dict) and prev.get("awaiting_details") and sel.get("action") not in {"confirm", "cancel"}:
+        detail = f"{prev.get('report', '')} {detail}"
+        try:
+            prev["awaiting_details"] = False
+            ctx.storage.set(sender, prev)
+        except Exception:
+            pass
+
     triage = triage_text(detail)
     # explicit track override from card
     if sel.get("track") in {"failed", "pending", "unauthorised"}:
@@ -154,11 +178,25 @@ async def on_message(ctx: Context, sender: str, msg: ChatMessage):
         "review",
         review_pack(rows, {"action": "confirm_pack"}, {"action": "cancel"}),
     ))
-    # store pack in storage for confirm step
+    # store pack in storage for confirm step (+ merge state for follow-ups)
+    missing = list(triage.missing_fields)
     try:
-        ctx.storage.set(sender, {"draft": pack.complaint_draft, "track": triage.transaction_type.value})
+        ctx.storage.set(sender, {
+            "draft": pack.complaint_draft,
+            "track": triage.transaction_type.value,
+            "report": detail,
+            "utr": triage.utr,
+            "amount": triage.amount,
+            "awaiting_details": bool(missing),
+        })
     except Exception:
         pass
+    if missing:
+        need = ", ".join(_MISSING_LABEL.get(m, m) for m in missing)
+        await ctx.send(sender, _text(
+            "To complete this case I still need: " + need
+            + ". Reply with it and I'll update the pack — anything you already gave is kept."
+        ))
 
 
 @chat_proto.on_message(ChatAcknowledgement)
