@@ -56,11 +56,9 @@ Rerun after **every** source change (tests fail if bundles go stale). Never hand
 Deploy order in Agentverse → Agents → Launch an Agent → Generate/blank agent → Build tab:
 
 1. Paste `hosted_triage.py`, Start, copy its address. Repeat for `hosted_policy.py`, `hosted_evidence.py`.
-2. Paste `hosted_payresolve.py` with env vars:
-   - `TRIAGE_AGENT_ADDRESS`, `POLICY_AGENT_ADDRESS`, `EVIDENCE_AGENT_ADDRESS` = the three hosted addresses from step 1
-   - `AGENT_SEED` + `TRIBUTE_SEED` + `POLICY_SEED` + `EVIDENCE_SEED` (unique, stable)
-   - `ASI1_API_KEY` (optional — deterministic fallback works without it)
-3. Start it, then `@PayResolve` in ASI:One.
+2. Paste `hosted_payresolve.py`, Start it, then mention it in ASI:One.
+3. **Do not rely on env vars on hosted agents** — Agentverse does not inject them.
+   Hosted behaviour is baked in by `scripts/build_hosted.py` (e.g. `DELEGATE_ENABLED=False`).
 
 Hosted agents stay up without your machine. SQLite cases fall back to a temp dir when the
 filesystem is read-only, so drafting still works.
@@ -78,8 +76,21 @@ Two supported patterns (docs: `uagents-adapter-guide`):
 - https://innovationlab.fetch.ai/resources/docs/asione/asi-one-quickstart
 - https://innovationlab.fetch.ai/resources/docs/agent-creation/uagents-adapter-guide
 
-## Submission (fill after deploy)
-- Agentverse profile URL: _
-- ASI:One shared chat URL: _
+## Submission
+- Agentverse agent profile: `https://agentverse.ai/agents/profile?address=agent1qw2ex8clxmdawmj4sfjdjmpskhv7revadhx7dc6tu9k0967t3x8aggg6a28p`
+- ASI:One shared chat URL: https://asi1.ai/chat/89c9d6ee-f1f9-4314-94e3-fc0d9597ba11?from=profile&handle=blank-agent-870
 - Demo video (3-5 min): _
 - Dashboard: ASI:One Fetch-A-Thon 3.0 → Project Submission Agent
+
+## What PayResolve does (submission blurb)
+UPI disputes fail in three legally distinct ways — `failed` (debited, beneficiary
+not credited), `pending` (still processing), and `unauthorised` (denied by the
+user) — and NPCI/RBI treat each differently. PayResolve takes a plain-language
+report, classifies the track, extracts the UTR/amount/date, computes how many
+days of the official TAT window have elapsed, decides whether to escalate now,
+lists the exact evidence required, and drafts a ready-to-send complaint with
+cited circulars. It never promises a refund — it recommends process.
+
+**Target users:** UPI users in India dealing with a stuck or disputed payment.
+**Outcome:** a decision (track, days remaining, who to contact, what to attach)
+plus a complaint draft — inside a single ASI:One chat.
