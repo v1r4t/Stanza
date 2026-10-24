@@ -76,6 +76,10 @@ def parse_selection(text):
     sel = {}
     if "start over" in low or "new case" in low or "restart" in low:
         sel["action"] = "cancel"
+    # Natural-language draft requests ("generate a complaint draft") must hit
+    # the same branch as the review card's Generate button.
+    if "draft" in low or "complaint" in low:
+        sel["action"] = "confirm"
     if "unauthor" in low or "fraud" in low:
         sel["track"] = "unauthorised"
     elif "pending" in low or "processing" in low:
