@@ -930,6 +930,23 @@ def _text(text: str) -> ChatMessage:
     )
 
 
+def _normalise(text: str) -> str:
+    """Strip @mentions, punctuation and filler so greeting detection works
+    even when ASI:One prefixes the message with the agent handle."""
+    import re
+    s = re.sub(r"@[\w\-\.]+", " ", text or "")
+    s = re.sub(r"[^\w\s]", " ", s)
+    return re.sub(r"\s+", " ", s).strip().lower()
+
+
+def _is_greeting(text: str) -> bool:
+    norm = _normalise(text)
+    if not norm:
+        return True
+    words = set(norm.split())
+    return len(words) <= 3 and bool(words & {"hi", "hello", "hey", "start", "help", "namaste", "yo"})
+
+
 _MISSING_LABEL = {
     "utr": "the 12-digit UTR from your payment history",
     "amount": "the amount in INR",
@@ -1034,7 +1051,7 @@ async def on_message(ctx: Context, sender: str, msg: ChatMessage):
         elif isinstance(item, EndSessionContent):
             ctx.logger.info(f"Session ended with {sender}")
 
-    if not last or last.strip().lower() in {"hi", "hello", "start", "help"}:
+    if not last or _is_greeting(last):
         await ctx.send(sender, card_message(
             "Welcome to PayResolve. Tell me what happened, or fill the intake form.",
             "form", intake_form(),
@@ -1103,8 +1120,14 @@ async def on_message(ctx: Context, sender: str, msg: ChatMessage):
         ))
         return
     # intake form submit or track pick carries JSON
-    if sel.get("action") in {"intake_submit", "pick_track"} or "track" in sel:
-        detail = f"{sel.get('track','')} amount={sel.get('amount','')} utr={sel.get('utr','')} {sel.get('details','')} {last}"
+    if sel.get("action") in {"intake_submit", "pick_track"} or "track" in sel or "status" in sel:
+        _track = sel.get("track") or sel.get("status") or ""
+        detail = (
+            f"{_track} amount={sel.get('amount','')} utr={sel.get('utr','')} "
+            f"{sel.get('details','')} {_track}"
+        )
+        if _track in {"failed", "pending", "unauthorised"}:
+            sel.setdefault("track", _track)
     else:
         detail = last
 
@@ -1162,8 +1185,9 @@ async def on_message(ctx: Context, sender: str, msg: ChatMessage):
             ))
             return
         await ctx.send(sender, card_message(
-            "I couldn't tell which situation this is — pick the closest one below.",
-            "carousel", track_carousel(),
+            "I need a bit more detail to place this correctly. Fill what you know below "
+            "(or just describe it in a sentence, e.g. \"Rs 2500 debited yesterday, merchant not credited\").",
+            "form", intake_form(),
         ))
         return
 
