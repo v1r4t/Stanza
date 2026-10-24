@@ -1,0 +1,6 @@
+{
+    "agent1qgdc7k44y9s4zgu6v0klxrku2djyjqff3z92ne76j8kyxlwsgfxpw9c2mpw": {
+        "draft": "To: Grievance Officer, [Your Bank/PSP]\nSubject: Dispute — failed UPI transaction UTR [UTR]\n\nTransaction amount: 2000.0\nType assessed: failed\n\nTimeline:\n- User report: failed amount= utr=  @payresolve  Failed: \"UPI Rs 2000 debited yesterday, merchant not credited, UTR [REDACTED_CARD]\" → expect assessment + review pack card.\n- Amount: INR 2000.0\n- Track: failed_payment (refund_guaranteed=False)\n\nRequest: investigate and confirm reversal/status per RBI/NPCI TAT.\nAttachments: masked statement, screenshots (no PIN/OTP).\n\n[Name, masked account, contact]",
+        "track": "failed"
+    }
+}

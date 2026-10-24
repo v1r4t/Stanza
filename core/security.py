@@ -3,8 +3,11 @@ from __future__ import annotations
 import re
 
 _PATTERNS = [
-    (re.compile(r"\b\d{12,19}\b"), "[REDACTED_CARD]"),
-    (re.compile(r"\b\d{9,18}\b"), "[REDACTED_ID]"),
+    # NOTE: exactly-12-digit runs are UPI UTRs — leave them intact so triage
+    # and complaint drafts keep the reference. Real PANs are 13-19 digits.
+    (re.compile(r"\b\d{13,19}\b"), "[REDACTED_CARD]"),
+    (re.compile(r"\b\d{13,18}\b"), "[REDACTED_ID]"),
+    (re.compile(r"\b\d{9,11}\b"), "[REDACTED_ID]"),
     (re.compile(r"\b\d{4}\s?\d{4}\s?\d{4}\b"), "[REDACTED_CARD]"),
     (re.compile(r"(?i)(upi\s*pin|otp|password|pwd)\s*[:=]?\s*\S+"), r"\1=[REDACTED]"),
 ]

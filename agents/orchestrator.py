@@ -104,7 +104,7 @@ async def on_message(ctx: Context, sender: str, msg: ChatMessage):
     else:
         detail = last
 
-    triage = triage_text(redact(detail))
+    triage = triage_text(detail)
     # explicit track override from card
     if sel.get("track") in {"failed", "pending", "unauthorised"}:
         from core.schemas import TransactionType

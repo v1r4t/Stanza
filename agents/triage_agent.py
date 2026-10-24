@@ -45,7 +45,7 @@ triage_proto = Protocol("payresolve-triage")
 
 @triage_proto.on_message(model=TriageRequest, replies={TriageResponse})
 async def handle_triage(ctx: Context, sender: str, msg: TriageRequest):
-    r = triage_text(redact(msg.text))
+    r = triage_text(msg.text or "")
     await ctx.send(sender, TriageResponse(
         transaction_type=r.transaction_type.value,
         debited=r.debited,

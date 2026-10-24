@@ -6,7 +6,9 @@ from .langchain_triage import llm_triage
 
 
 def triage_text(text: str) -> TriageResult:
-    return llm_triage(redact(text))
+    # Extract from raw text FIRST — redaction would destroy the 12-digit UTR.
+    # Callers redact separately for logs/LLM prompts via security.redact.
+    return llm_triage(text or "")
 
 
 def policy_for(triage: TriageResult) -> PolicyFinding:
