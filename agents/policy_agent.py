@@ -2,6 +2,7 @@ from __future__ import annotations
 import os
 from dotenv import load_dotenv
 from uagents import Agent, Context, Model, Protocol
+from uagents.setup import fund_agent_if_low
 
 load_dotenv()
 from core.schemas import TransactionType
@@ -27,7 +28,10 @@ policy_agent = Agent(
     seed=os.getenv("POLICY_SEED", "payresolve-policy-v1"),
     port=8003,
     mailbox=True,
+    network="testnet",
 )
+
+fund_agent_if_low(str(policy_agent.wallet.address()))
 policy_proto = Protocol("payresolve-policy")
 
 

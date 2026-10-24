@@ -2,6 +2,7 @@ from __future__ import annotations
 import os
 from dotenv import load_dotenv
 from uagents import Agent, Context, Model, Protocol
+from uagents.setup import fund_agent_if_low
 
 load_dotenv()
 from core.schemas import TriageResult, TransactionType
@@ -26,7 +27,10 @@ evidence_agent = Agent(
     seed=os.getenv("EVIDENCE_SEED", "payresolve-evidence-v1"),
     port=8004,
     mailbox=True,
+    network="testnet",
 )
+
+fund_agent_if_low(str(evidence_agent.wallet.address()))
 evidence_proto = Protocol("payresolve-evidence")
 
 

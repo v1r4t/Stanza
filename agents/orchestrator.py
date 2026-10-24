@@ -14,6 +14,7 @@ from uuid import uuid4
 
 from dotenv import load_dotenv
 from uagents import Agent, Context, Protocol
+from uagents.setup import fund_agent_if_low
 from uagents_core.contrib.protocols.chat import (
     ChatAcknowledgement,
     ChatMessage,
@@ -36,7 +37,10 @@ agent = Agent(
     port=8001,
     mailbox=True,
     publish_agent_details=True,
+    network="testnet",
 )
+
+fund_agent_if_low(str(agent.wallet.address()))
 
 chat_proto = Protocol(spec=chat_protocol_spec)
 
