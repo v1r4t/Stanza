@@ -9,7 +9,11 @@ Fetch.ai-native multi-agent payment dispute resolver. Working ASI:One interface,
 
 ## Agents
 - `PayResolve` (agents/orchestrator.py, port 8001) — public ACP entry, Interactive Cards
-- `payresolve-triage` (port 8002), `payresolve-policy` (port 8003), `payresolve-evidence` (port 8004)
+  - dev address: `agent1qf5maaj2jw7z69qewwwat3p02kzfnx0lcnhzvnuq2v5w83mhwdhszhlgej8`
+- `payresolve-triage` (port 8002) — dev address: `agent1qgxex2xv5834jh7hsec0e9xjcgmvhur8rz9fj9dcquvawdwn30q665cf45e`
+- `payresolve-policy` (port 8003) — dev address: `agent1q099ulyv0l4wvlgztyl82qe927rtpc8cp56lm0klhawa7zk0entdy3u9767`
+- `payresolve-evidence` (port 8004) — dev address: `agent1qwzmerm3xkwrkwscqynudmwjgg4ayzmhrmlknrhazgal9c6sttyaxztrq25`
+- NOTE: dev-seed addresses; your `AGENT_SEED` / `TRIBUTE_SEED` / `POLICY_SEED` / `EVIDENCE_SEED` will change these.
 
 ## Run
 ```
