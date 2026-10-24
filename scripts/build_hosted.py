@@ -39,6 +39,18 @@ BUNDLES = {
     "hosted_evidence.py": ("agents/evidence_agent.py", []),
 }
 
+# Agentverse hosted does NOT inject environment variables (verified: it ignored
+# AGENT_SEED and DELEGATE_ENABLED). Anything that must differ when hosted has to
+# be baked into the bundle here.
+HOSTED_OVERRIDES = {
+    "hosted_payresolve.py": [
+        (
+            'DELEGATE_ENABLED = os.getenv("DELEGATE_ENABLED", "true").strip().lower() != "false"',
+            "DELEGATE_ENABLED = False  # baked: hosted wrapper cannot decode custom models",
+        ),
+    ],
+}
+
 _LOCAL_IMPORT_RE = re.compile(r"^(from\s+core[\.\s]|from\s+\.)")
 
 
@@ -69,6 +81,10 @@ def build(name: str, agent_rel: str, extra_core: list[str]) -> pathlib.Path:
     parts.append(f"\n# ===== {agent_rel} (flattened) =====")
     parts.append(_transform((ROOT / agent_rel).read_text(encoding="utf-8")))
     text = "\n".join(parts)
+
+    for needle, replacement in HOSTED_OVERRIDES.get(name, []):
+        assert needle in text, f"{name}: override target missing: {needle[:60]}"
+        text = text.replace(needle, replacement)
 
     # Fail loudly on anything that would break hosted imports.
     for i, ln in enumerate(text.splitlines(), 1):

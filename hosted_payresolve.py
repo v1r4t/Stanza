@@ -931,7 +931,7 @@ _DELEGATE_TIMEOUT_S = int(os.getenv("DELEGATE_TIMEOUT_S", "10"))
 # Agentverse hosted wrappers do not register our custom Model types, so
 # specialist replies arrive undecodable ("Unable to determine message model").
 # Hosted deployments run the consolidated in-process pipeline instead.
-DELEGATE_ENABLED = os.getenv("DELEGATE_ENABLED", "true").strip().lower() != "false"
+DELEGATE_ENABLED = False  # baked: hosted wrapper cannot decode custom models
 
 SEED = os.getenv("AGENT_SEED", "payresolve-dev-seed-do-not-use-in-prod")
 
