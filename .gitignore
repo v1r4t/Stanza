@@ -4,3 +4,5 @@ __pycache__/
 .pytest_cache/
 *.py[cod]
 .python-version
+# uAgents local storage snapshots (per-address runtime state)
+*_data.json
