@@ -20,6 +20,11 @@ policy_agent = Agent(
 )
 
 fund_agent_if_low(str(policy_agent.wallet.address()))
+
+
+@policy_agent.on_event("startup")
+async def _log_address(ctx: Context):
+    ctx.logger.info(f"[startup] {policy_agent.name} ADDRESS={policy_agent.address}")
 policy_proto = Protocol("payresolve-policy")
 
 

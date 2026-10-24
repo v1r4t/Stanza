@@ -773,6 +773,11 @@ evidence_agent = Agent(
 )
 
 fund_agent_if_low(str(evidence_agent.wallet.address()))
+
+
+@evidence_agent.on_event("startup")
+async def _log_address(ctx: Context):
+    ctx.logger.info(f"[startup] {evidence_agent.name} ADDRESS={evidence_agent.address}")
 evidence_proto = Protocol("payresolve-evidence")
 
 

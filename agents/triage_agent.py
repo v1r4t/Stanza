@@ -28,6 +28,11 @@ triage_agent = Agent(
 
 fund_agent_if_low(str(triage_agent.wallet.address()))
 
+
+@triage_agent.on_event("startup")
+async def _log_address(ctx: Context):
+    ctx.logger.info(f"[startup] {triage_agent.name} ADDRESS={triage_agent.address}")
+
 triage_proto = Protocol("payresolve-triage")
 
 

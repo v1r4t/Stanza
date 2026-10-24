@@ -906,6 +906,13 @@ agent = Agent(
 
 fund_agent_if_low(str(agent.wallet.address()))
 
+
+@agent.on_event("startup")
+async def _log_address(ctx: Context):
+    """Print our own address so hosted deployments (where the dashboard
+    overrides our seed) can be wired up from the log panel."""
+    ctx.logger.info(f"[startup] {agent.name} ADDRESS={agent.address}")
+
 chat_proto = Protocol(spec=chat_protocol_spec)
 
 
