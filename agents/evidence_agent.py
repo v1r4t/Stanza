@@ -1,6 +1,9 @@
 from __future__ import annotations
 import os
+from dotenv import load_dotenv
 from uagents import Agent, Context, Model, Protocol
+
+load_dotenv()
 from core.schemas import TriageResult, TransactionType
 from core.resolution import policy_for, build_pack
 

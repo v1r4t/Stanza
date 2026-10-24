@@ -6,7 +6,10 @@ multi-agent orchestration (not just LLM personas).
 """
 from __future__ import annotations
 import os
+from dotenv import load_dotenv
 from uagents import Agent, Context, Model, Protocol
+
+load_dotenv()
 
 from core.resolution import triage_text, policy_for, build_pack
 from core.schemas import TriageResult
