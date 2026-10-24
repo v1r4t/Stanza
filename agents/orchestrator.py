@@ -98,6 +98,32 @@ async def on_message(ctx: Context, sender: str, msg: ChatMessage):
         return
 
     sel = parse_selection(last)
+    # Confirm / cancel from the review pack card
+    if sel.get("action") == "confirm":
+        try:
+            saved = ctx.storage.get(sender) or {}
+        except Exception:
+            saved = {}
+        draft = saved.get("draft") if isinstance(saved, dict) else None
+        if draft:
+            await ctx.send(sender, _text(
+                "Here is your complaint draft — copy, fill the [brackets], and send it to your bank/PSP:\n\n" + draft
+            ))
+        else:
+            await ctx.send(sender, _text(
+                "No active case pack in this session. Describe the transaction (UTR, amount, what happened) and I'll build one."
+            ))
+        return
+    if sel.get("action") == "cancel":
+        try:
+            ctx.storage.set(sender, {})
+        except Exception:
+            pass
+        await ctx.send(sender, card_message(
+            "Started over. Tell me what happened, or fill the intake form.",
+            "form", intake_form(),
+        ))
+        return
     # intake form submit or track pick carries JSON
     if sel.get("action") in {"intake_submit", "pick_track"} or "track" in sel:
         detail = f"{sel.get('track','')} amount={sel.get('amount','')} utr={sel.get('utr','')} {sel.get('details','')} {last}"
