@@ -27,6 +27,22 @@ from uagents_core.contrib.protocols.chat import (
 from core.cards import card_message, intake_form, track_carousel, review_pack, parse_selection
 from core.resolution import triage_text, policy_for, build_pack, elaborate_assessment
 from core.security import redact
+from core.schemas import TransactionType, TriageResult, PolicyFinding, EvidencePack
+from core.cases import case_id_for, short_ref, save_case, get_case
+
+TRIAGE_AGENT_ADDRESS = os.getenv(
+    "TRIAGE_AGENT_ADDRESS",
+    "agent1qwd7l7jv9fzpkej7nq4c8wjxfs8vgw9unddst5q08076yn92k5uy5l043dq",
+)
+POLICY_AGENT_ADDRESS = os.getenv(
+    "POLICY_AGENT_ADDRESS",
+    "agent1qggnj3j4jvz9su2eefhf7l9rprjsccjphjxdan77wmahe9tgtmz5yxppwr7",
+)
+EVIDENCE_AGENT_ADDRESS = os.getenv(
+    "EVIDENCE_AGENT_ADDRESS",
+    "agent1qvnrqea7eflv2my3szqtn2jdq82uu7dspuguzdgvmnpqf2c2nx70qxd5u79",
+)
+_DELEGATE_TIMEOUT_S = int(os.getenv("DELEGATE_TIMEOUT_S", "25"))
 
 load_dotenv()
 SEED = os.getenv("AGENT_SEED", "payresolve-dev-seed-do-not-use-in-prod")
@@ -83,6 +99,87 @@ def _asi1_reply(prompt: str) -> str | None:
         return None
 
 
+async def _delegate_triage(ctx: Context, detail: str) -> tuple[TriageResult, bool]:
+    """Ask the triage specialist over ACP; fall back to local logic."""
+    try:
+        from core.messages import TriageRequest, TriageResponse
+        resp, _status = await ctx.send_and_receive(
+            TRIAGE_AGENT_ADDRESS, TriageRequest(text=detail), TriageResponse,
+            timeout=_DELEGATE_TIMEOUT_S,
+        )
+        if resp is None:
+            raise TimeoutError("triage specialist did not reply")
+        try:
+            ttype = TransactionType(resp.transaction_type)
+        except Exception:
+            ttype = TransactionType.UNKNOWN
+        ctx.logger.info(f"[delegate] triage via agent: {ttype.value}")
+        return TriageResult(
+            transaction_type=ttype, debited=resp.debited, utr=resp.utr,
+            amount=resp.amount, missing_fields=list(resp.missing_fields),
+            urgency=resp.urgency, occurred_on=resp.occurred_on,
+            days_elapsed=resp.days_elapsed, raw_text=detail,
+        ), True
+    except Exception as e:
+        ctx.logger.warning(f"[delegate] triage fallback to local: {e}")
+        return triage_text(detail), False
+
+
+async def _delegate_policy(ctx: Context, triage: TriageResult) -> tuple[PolicyFinding, bool]:
+    """Ask the policy specialist over ACP; fall back to local logic."""
+    try:
+        from core.messages import PolicyRequest, PolicyResponse
+        resp, _status = await ctx.send_and_receive(
+            POLICY_AGENT_ADDRESS,
+            PolicyRequest(
+                transaction_type=triage.transaction_type.value, utr=triage.utr,
+                occurred_on=triage.occurred_on, days_elapsed=triage.days_elapsed,
+            ),
+            PolicyResponse, timeout=_DELEGATE_TIMEOUT_S,
+        )
+        if resp is None:
+            raise TimeoutError("policy specialist did not reply")
+        ctx.logger.info(f"[delegate] policy via agent: {resp.track}")
+        return PolicyFinding(
+            track=resp.track, source_ids=list(resp.source_ids),
+            conditions=list(resp.conditions), timelines=list(resp.timelines),
+            escalation=list(resp.escalation), refund_guaranteed=False,
+            uncertainty=list(resp.uncertainty), escalate_now=resp.escalate_now,
+            evidence=list(resp.evidence),
+        ), True
+    except Exception as e:
+        ctx.logger.warning(f"[delegate] policy fallback to local: {e}")
+        return policy_for(triage), False
+
+
+async def _delegate_evidence(ctx: Context, triage: TriageResult, detail: str,
+                             policy: PolicyFinding):
+    """Ask the evidence specialist over ACP; returns EvidencePack or (None, False)."""
+    try:
+        from core.messages import EvidenceRequest, EvidenceResponse
+        resp, _status = await ctx.send_and_receive(
+            EVIDENCE_AGENT_ADDRESS,
+            EvidenceRequest(
+                transaction_type=triage.transaction_type.value, utr=triage.utr,
+                amount=triage.amount, report=detail,
+                occurred_on=triage.occurred_on, days_elapsed=triage.days_elapsed,
+            ),
+            EvidenceResponse, timeout=_DELEGATE_TIMEOUT_S,
+        )
+        if resp is None:
+            raise TimeoutError("evidence specialist did not reply")
+        ctx.logger.info("[delegate] evidence via agent")
+        return EvidencePack(
+            timeline=list(resp.timeline), missing_evidence=list(resp.missing_evidence),
+            official_sources=policy.source_ids, complaint_draft=resp.complaint_draft,
+            verified_facts=[f"classification={triage.transaction_type.value}"],
+            user_reported=[redact(detail)[:300]], unresolved=policy.uncertainty,
+        ), True
+    except Exception as e:
+        ctx.logger.warning(f"[delegate] evidence fallback to local: {e}")
+        return None, False
+
+
 @chat_proto.on_message(ChatMessage)
 async def on_message(ctx: Context, sender: str, msg: ChatMessage):
     await ctx.send(
@@ -114,19 +211,35 @@ async def on_message(ctx: Context, sender: str, msg: ChatMessage):
             saved = ctx.storage.get(sender) or {}
         except Exception:
             saved = {}
-        draft = saved.get("draft") if isinstance(saved, dict) else None
-        # Rebuild fresh from the stored report so template upgrades and any
+        if not isinstance(saved, dict):
+            saved = {}
+        draft = saved.get("draft")
+        report = saved.get("report")
+        # Prefer the persisted SQLite case (survives restarts).
+        try:
+            if saved.get("case_id"):
+                row = get_case(saved["case_id"])
+                if row:
+                    draft = row.get("draft") or draft
+                    report = row.get("report") or report
+        except Exception:
+            pass
+        # Rebuild fresh from stored report so template upgrades and any
         # merged details always apply — never serve a stale stored draft.
         try:
-            if isinstance(saved, dict) and saved.get("report"):
-                fresh = triage_text(saved["report"])
+            if report:
+                fresh = triage_text(report)
                 if fresh.transaction_type.value == "unknown" and saved.get("track") in {"failed", "pending", "unauthorised"}:
-                    from core.schemas import TransactionType
                     fresh.transaction_type = TransactionType(saved["track"])
                 fresh_pack = build_pack(fresh, policy_for(fresh))
                 draft = fresh_pack.complaint_draft
                 saved["draft"] = draft
                 ctx.storage.set(sender, saved)
+                try:
+                    save_case(saved.get("case_id") or case_id_for(fresh.utr, fresh.occurred_on),
+                              sender, fresh.transaction_type.value, fresh.utr, fresh.amount, draft, report)
+                except Exception:
+                    pass
         except Exception:
             pass
         if draft:
@@ -168,15 +281,18 @@ async def on_message(ctx: Context, sender: str, msg: ChatMessage):
         except Exception:
             pass
 
-    triage = triage_text(detail)
+    # Real multi-agent path: coordinator delegates to specialists over ACP,
+    # with local fallbacks so the demo never dies on a hung handoff.
+    triage, _triage_live = await _delegate_triage(ctx, detail)
     # explicit track override from card
     if sel.get("track") in {"failed", "pending", "unauthorised"}:
-        from core.schemas import TransactionType
         triage.transaction_type = TransactionType(sel["track"])
         triage.urgency = "high" if sel["track"] == "unauthorised" else triage.urgency
 
-    policy = policy_for(triage)
-    pack = build_pack(triage, policy)
+    policy, _policy_live = await _delegate_policy(ctx, triage)
+    pack, _evidence_live = await _delegate_evidence(ctx, triage, detail, policy)
+    if pack is None:
+        pack = build_pack(triage, policy)
 
     # Step 1: show classification carousel for confirmation if unknown/low-confidence.
     # But if a case is already open and this message carries no NEW UTR, it is
@@ -213,7 +329,10 @@ async def on_message(ctx: Context, sender: str, msg: ChatMessage):
         ))
         return
 
-    narration, rows = elaborate_assessment(triage, policy)
+    cid = case_id_for(triage.utr, triage.occurred_on)
+    day_n = triage.days_elapsed + 1 if triage.days_elapsed is not None else None
+    case_label = f"Case {short_ref(triage.utr, triage.occurred_on)}" + (f" · Day {day_n}" if day_n else "")
+    narration, rows = elaborate_assessment(triage, policy, case_ref=case_label)
     await ctx.send(sender, card_message(
         narration + " I cite official sources and never promise refunds.",
         "review",
@@ -229,9 +348,15 @@ async def on_message(ctx: Context, sender: str, msg: ChatMessage):
             "utr": triage.utr,
             "amount": triage.amount,
             "awaiting_details": bool(missing),
+            "case_id": cid,
         })
     except Exception:
         pass
+    try:
+        save_case(cid, sender, triage.transaction_type.value, triage.utr,
+                  triage.amount, pack.complaint_draft, detail)
+    except Exception as e:
+        ctx.logger.warning(f"[cases] persist failed: {e}")
     if missing:
         need = ", ".join(_MISSING_LABEL.get(m, m) for m in missing)
         await ctx.send(sender, _text(

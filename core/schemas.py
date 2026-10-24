@@ -20,6 +20,8 @@ class TriageResult(BaseModel):
     utr: str | None = None
     amount: float | None = None
     raw_text: str = ""
+    occurred_on: str | None = None  # ISO date parsed from the report
+    days_elapsed: int | None = None  # today - occurred_on in days
 
 
 class PolicyFinding(BaseModel):
@@ -30,6 +32,8 @@ class PolicyFinding(BaseModel):
     escalation: list[str] = Field(default_factory=list)
     refund_guaranteed: bool = False
     uncertainty: list[str] = Field(default_factory=list)
+    escalate_now: bool = False  # computed decision, not advice text
+    evidence: list[str] = Field(default_factory=list)  # per-track checklist
 
 
 class EvidencePack(BaseModel):

@@ -15,19 +15,7 @@ load_dotenv()
 from core.resolution import triage_text, policy_for, build_pack
 from core.schemas import TriageResult
 from core.security import redact
-
-
-class TriageRequest(Model):
-    text: str
-
-
-class TriageResponse(Model):
-    transaction_type: str
-    debited: bool
-    utr: str | None
-    amount: float | None
-    missing_fields: list[str]
-    urgency: str
+from core.messages import TriageRequest, TriageResponse
 
 
 triage_agent = Agent(
@@ -53,6 +41,8 @@ async def handle_triage(ctx: Context, sender: str, msg: TriageRequest):
         amount=r.amount,
         missing_fields=r.missing_fields,
         urgency=r.urgency,
+        occurred_on=r.occurred_on,
+        days_elapsed=r.days_elapsed,
     ))
 
 

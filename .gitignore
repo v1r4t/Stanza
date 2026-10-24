@@ -6,3 +6,5 @@ __pycache__/
 .python-version
 # uAgents local storage snapshots (per-address runtime state)
 *_data.json
+# SQLite case store (runtime state, rebuilt automatically)
+*.db

@@ -8,19 +8,7 @@ load_dotenv()
 from core.schemas import TransactionType
 from core.resolution import policy_for
 from core.schemas import TriageResult
-
-
-class PolicyRequest(Model):
-    transaction_type: str
-    utr: str | None = None
-
-
-class PolicyResponse(Model):
-    track: str
-    timelines: list[str]
-    escalation: list[str]
-    refund_guaranteed: bool
-    uncertainty: list[str]
+from core.messages import PolicyRequest, PolicyResponse
 
 
 policy_agent = Agent(
@@ -41,11 +29,19 @@ async def handle_policy(ctx: Context, sender: str, msg: PolicyRequest):
         ttype = TransactionType(msg.transaction_type)
     except Exception:
         ttype = TransactionType.UNKNOWN
-    triage = TriageResult(transaction_type=ttype, utr=msg.utr, raw_text="")
+    triage = TriageResult(
+        transaction_type=ttype,
+        utr=msg.utr,
+        raw_text="",
+        occurred_on=msg.occurred_on,
+        days_elapsed=msg.days_elapsed,
+    )
     p = policy_for(triage)
     await ctx.send(sender, PolicyResponse(
         track=p.track, timelines=p.timelines, escalation=p.escalation,
         refund_guaranteed=False, uncertainty=p.uncertainty,
+        source_ids=p.source_ids, conditions=p.conditions,
+        escalate_now=p.escalate_now, evidence=p.evidence,
     ))
 
 

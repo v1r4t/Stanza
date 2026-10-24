@@ -1,5 +1,5 @@
 from __future__ import annotations
-from .schemas import TriageResult, PolicyFinding, EvidencePack
+from .schemas import TriageResult, PolicyFinding, EvidencePack, TransactionType
 from .policy_rules import get_resolution_track, OFFICIAL_SOURCES
 from .security import redact, build_complaint_draft
 from .langchain_triage import llm_triage
@@ -11,13 +11,37 @@ def triage_text(text: str) -> TriageResult:
     return llm_triage(text or "")
 
 
+def _decide_escalation(triage: TriageResult) -> tuple[bool, str | None]:
+    """Computed decision, not advice text. (escalate_now, tat_note)."""
+    t = triage.transaction_type
+    d = triage.days_elapsed
+    if t == TransactionType.UNAUTHORISED:
+        return True, "report immediately — zero-liability clock runs from discovery"
+    if t == TransactionType.FAILED:
+        if d is None:
+            return False, "date unknown — assume within T+1 auto-reversal window"
+        if d > 1:
+            return True, f"day {d + 1} — T+1 auto-reversal window passed"
+        return False, f"day {d + 1} of T+1 auto-reversal window — hold"
+    if t == TransactionType.PENDING:
+        if d is None:
+            return False, "recheck after the processing window"
+        if d > 2:
+            return True, f"day {d + 1} pending — treat as failed, escalate"
+        return False, f"day {d + 1} — still in window"
+    return False, None
+
+
 def policy_for(triage: TriageResult) -> PolicyFinding:
     route = get_resolution_track(triage.transaction_type)
+    escalate_now, tat_note = _decide_escalation(triage)
     uncertainty = []
     if triage.transaction_type.value == "unknown":
         uncertainty.append("insufficient data — collected via intake form")
     if not triage.utr:
         uncertainty.append("UTR missing — timelines conditional on PSP lookup")
+    if tat_note:
+        uncertainty.append(tat_note)
     return PolicyFinding(
         track=route["track"],
         source_ids=route["source_ids"],
@@ -26,6 +50,8 @@ def policy_for(triage: TriageResult) -> PolicyFinding:
         escalation=route["escalation"],
         refund_guaranteed=False,
         uncertainty=uncertainty,
+        escalate_now=escalate_now,
+        evidence=list(route.get("evidence", [])),
     )
 
 
@@ -48,9 +74,7 @@ def build_pack(triage: TriageResult, policy: PolicyFinding) -> EvidencePack:
     if triage.amount is not None:
         timeline.append(f"Amount: INR {triage.amount:g}")
     timeline.append(f"Track: {triage.transaction_type.value} — resolution per official RBI/NPCI timelines (no refund promised)")
-    missing = list(triage.missing_fields)
-    if triage.transaction_type.value == "unauthorised":
-        missing.append("bank acknowledgement + cybercrime ref (1930 / cybercrime.gov.in)")
+    missing = list(dict.fromkeys(triage.missing_fields))
     draft = build_complaint_draft(triage.utr, triage.amount, triage.transaction_type.value, timeline)
     return EvidencePack(
         timeline=timeline,
@@ -105,19 +129,46 @@ _DEADLINE = {
 }
 
 
-def elaborate_assessment(triage: TriageResult, policy: PolicyFinding) -> tuple[str, list[dict]]:
+def _deadline_row(triage: TriageResult, policy: PolicyFinding) -> str:
+    prefix = "ESCALATE NOW — " if policy.escalate_now else ""
+    t = triage.transaction_type.value
+    d = triage.days_elapsed
+    if t == "failed":
+        if d is None:
+            return prefix + "Within T+1 auto-reversal window — escalate if no credit (date unknown)"
+        if d > 1:
+            return prefix + f"Day {d + 1} — T+1 window passed, escalate with UTR"
+        return prefix + f"Day {d + 1} of T+1 window — hold, do not escalate yet"
+    if t == "pending":
+        if d is None:
+            return prefix + "Recheck after the processing window; escalate only if it flips to failed"
+        if d > 2:
+            return prefix + f"Day {d + 1} — treat as failed, escalate"
+        return prefix + f"Day {d + 1} — still in window"
+    if t == "unauthorised":
+        return prefix + "Today — immediately (liability clock runs from discovery)"
+    return "—"
+
+
+def elaborate_assessment(triage: TriageResult, policy: PolicyFinding, case_ref: str | None = None) -> tuple[str, list[dict]]:
     """Glanceable verdict + card rows. Deterministic — no LLM, no invented timelines."""
     t = triage.transaction_type.value
     amt = f"Rs {triage.amount:g}" if triage.amount is not None else "the amount"
     utr_bit = f" (UTR …{triage.utr[-4:]})" if triage.utr else " (UTR missing — timelines stay conditional)"
     steps = [_ACTION_PLAIN.get(a, a) for a in policy.timelines]
     narration = f"{_VERDICT_LONG.get(t, _VERDICT_LONG['unknown'])} {amt}{utr_bit} " + " ".join(steps)
+    if case_ref:
+        narration = f"[{case_ref}] " + narration
     rows = [
         {"label": "Verdict", "value": _VERDICT_SHORT.get(t, _VERDICT_SHORT["unknown"])},
         {"label": "UTR", "value": triage.utr or "missing"},
         {"label": "Amount", "value": f"{triage.amount:g}" if triage.amount is not None else "missing"},
-        {"label": "Deadline", "value": _DEADLINE.get(t, "—")},
+        {"label": "Deadline", "value": _deadline_row(triage, policy)},
         {"label": "Where", "value": _WHERE.get(t, "—")},
         {"label": "Next", "value": "; ".join(steps[:3])},
+        {"label": "Attach", "value": "; ".join(policy.evidence[:3]) or "—"},
+        {"label": "Sources", "value": "; ".join(policy.source_ids) or "—"},
     ]
+    if case_ref:
+        rows.insert(0, {"label": "Case", "value": case_ref})
     return narration, rows

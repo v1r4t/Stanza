@@ -7,19 +7,7 @@ from uagents.setup import fund_agent_if_low
 load_dotenv()
 from core.schemas import TriageResult, TransactionType
 from core.resolution import policy_for, build_pack
-
-
-class EvidenceRequest(Model):
-    transaction_type: str
-    utr: str | None = None
-    amount: float | None = None
-    report: str = ""
-
-
-class EvidenceResponse(Model):
-    complaint_draft: str
-    missing_evidence: list[str]
-    timeline: list[str]
+from core.messages import EvidenceRequest, EvidenceResponse
 
 
 evidence_agent = Agent(
@@ -40,7 +28,10 @@ async def handle_evidence(ctx: Context, sender: str, msg: EvidenceRequest):
         ttype = TransactionType(msg.transaction_type)
     except Exception:
         ttype = TransactionType.UNKNOWN
-    triage = TriageResult(transaction_type=ttype, utr=msg.utr, amount=msg.amount, raw_text=msg.report)
+    triage = TriageResult(
+        transaction_type=ttype, utr=msg.utr, amount=msg.amount, raw_text=msg.report,
+        occurred_on=msg.occurred_on, days_elapsed=msg.days_elapsed,
+    )
     pack = build_pack(triage, policy_for(triage))
     await ctx.send(sender, EvidenceResponse(
         complaint_draft=pack.complaint_draft,

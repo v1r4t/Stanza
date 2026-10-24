@@ -12,6 +12,7 @@ to keyword triage so tests run offline.
 from __future__ import annotations
 import os
 import re
+from datetime import date
 from .schemas import TriageResult, TransactionType
 
 _KEYWORDS = {
@@ -26,20 +27,23 @@ def keyword_triage(text: str) -> TriageResult:
     for ttype, words in _KEYWORDS.items():
         if any(w in low for w in words):
             urgency = "high" if ttype == TransactionType.UNAUTHORISED else "normal"
+            occurred = _find_date(text)
             return TriageResult(
                 transaction_type=ttype,
                 debited=("debit" in low or "paid" in low or "deduct" in low),
                 merchant_status="as_reported",
-                missing_fields=_missing(text),
+                missing_fields=_missing(text, ttype),
                 urgency=urgency,
                 utr=_find_utr(text),
                 amount=_find_amount(text),
                 raw_text=text or "",
+                occurred_on=occurred.isoformat() if occurred else None,
+                days_elapsed=(date.today() - occurred).days if occurred else None,
             )
     return TriageResult(transaction_type=TransactionType.UNKNOWN, missing_fields=["status", "utr_or_date", "amount"], raw_text=text or "")
 
 
-def _missing(text: str) -> list[str]:
+def _missing(text: str, ttype: TransactionType | None = None) -> list[str]:
     m = []
     if not _find_utr(text):
         m.append("utr")
@@ -47,7 +51,44 @@ def _missing(text: str) -> list[str]:
         m.append("amount")
     if not text or len(text) < 20:
         m.append("details")
+    if ttype == TransactionType.FAILED:
+        m.append("debit proof (SMS/statement screenshot)")
+    elif ttype == TransactionType.PENDING:
+        m.append("status screenshot (for recheck)")
+    elif ttype == TransactionType.UNAUTHORISED:
+        m += [
+            "block confirmation (UPI/cards disabled)",
+            "bank acknowledgement / complaint number",
+            "1930 helpline or cybercrime.gov.in reference",
+        ]
     return m
+
+
+def _find_date(text: str):
+    """Parse an explicit date or relative day reference. Returns date | None."""
+    from datetime import date as _date, timedelta as _td
+    low = (text or "").lower()
+    today = _date.today()
+    if "today" in low:
+        return today
+    if "yesterday" in low:
+        return today - _td(days=1)
+    mt = re.search(r"(\d+)\s+days?\s+ago", low)
+    if mt:
+        try:
+            return today - _td(days=min(int(mt.group(1)), 3650))
+        except Exception:
+            pass
+    mt = re.search(r"\b(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})\b", text or "")
+    if mt:
+        try:
+            d, mo, y = int(mt.group(1)), int(mt.group(2)), int(mt.group(3))
+            if y < 100:
+                y += 2000
+            return _date(y, mo, d)
+        except Exception:
+            return None
+    return None
 
 
 def _find_utr(text: str) -> str | None:
