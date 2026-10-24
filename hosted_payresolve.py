@@ -914,6 +914,10 @@ EVIDENCE_AGENT_ADDRESS = os.getenv(
     "agent1qvnrqea7eflv2my3szqtn2jdq82uu7dspuguzdgvmnpqf2c2nx70qxd5u79",
 )
 _DELEGATE_TIMEOUT_S = int(os.getenv("DELEGATE_TIMEOUT_S", "10"))
+# Agentverse hosted wrappers do not register our custom Model types, so
+# specialist replies arrive undecodable ("Unable to determine message model").
+# Hosted deployments run the consolidated in-process pipeline instead.
+DELEGATE_ENABLED = os.getenv("DELEGATE_ENABLED", "true").strip().lower() != "false"
 
 SEED = os.getenv("AGENT_SEED", "payresolve-dev-seed-do-not-use-in-prod")
 
@@ -981,6 +985,8 @@ _MISSING_LABEL = {
 
 async def _delegate_triage(ctx: Context, detail: str) -> tuple[TriageResult, bool]:
     """Ask the triage specialist over ACP; fall back to local logic."""
+    if not DELEGATE_ENABLED:
+        return triage_text(detail), False
     try:
         resp, _status = await ctx.send_and_receive(
             TRIAGE_AGENT_ADDRESS, TriageRequest(text=detail), TriageResponse,
@@ -1006,6 +1012,8 @@ async def _delegate_triage(ctx: Context, detail: str) -> tuple[TriageResult, boo
 
 async def _delegate_policy(ctx: Context, triage: TriageResult) -> tuple[PolicyFinding, bool]:
     """Ask the policy specialist over ACP; fall back to local logic."""
+    if not DELEGATE_ENABLED:
+        return policy_for(triage), False
     try:
         resp, _status = await ctx.send_and_receive(
             POLICY_AGENT_ADDRESS,
@@ -1033,6 +1041,8 @@ async def _delegate_policy(ctx: Context, triage: TriageResult) -> tuple[PolicyFi
 async def _delegate_evidence(ctx: Context, triage: TriageResult, detail: str,
                              policy: PolicyFinding):
     """Ask the evidence specialist over ACP; returns EvidencePack or (None, False)."""
+    if not DELEGATE_ENABLED:
+        return None, False
     try:
         resp, _status = await ctx.send_and_receive(
             EVIDENCE_AGENT_ADDRESS,
