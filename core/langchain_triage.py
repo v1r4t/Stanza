@@ -127,10 +127,18 @@ def _sane_amount(v: float | None) -> float | None:
 
 
 def llm_triage(text: str) -> TriageResult:
-    """Use LangChain ChatOpenAI -> ASI1 if configured, else keyword fallback."""
+    """Keyword-first for speed; ASI1 only for genuinely ambiguous input.
+
+    Keyword triage is deterministic and instant, and the 3-track rules are
+    deterministic anyway. Calling the LLM on every message added seconds of
+    latency for no accuracy gain — it now runs only when keywords find nothing.
+    """
+    base = keyword_triage(text)
+    if base.transaction_type != TransactionType.UNKNOWN:
+        return base
     api_key = os.getenv("ASI1_API_KEY") or os.getenv("ASI_ONE_API_KEY")
-    if not api_key:
-        return keyword_triage(text)
+    if not api_key or os.getenv("USE_LLM_TRIAGE", "true").strip().lower() == "false":
+        return base
     try:
         from langchain_openai import ChatOpenAI
         llm = ChatOpenAI(
@@ -138,6 +146,8 @@ def llm_triage(text: str) -> TriageResult:
             api_key=api_key,
             model=os.getenv("ASI1_MODEL", "asi1-mini"),
             temperature=0,
+            timeout=float(os.getenv("LLM_TIMEOUT_S", "6")),
+            max_retries=0,
         )
         prompt = (
             "Classify UPI dispute into exactly one: failed, pending, unauthorised, unknown. "
