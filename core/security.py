@@ -8,7 +8,9 @@ _PATTERNS = [
     (re.compile(r"\b\d{13,19}\b"), "[REDACTED_CARD]"),
     (re.compile(r"\b\d{13,18}\b"), "[REDACTED_ID]"),
     (re.compile(r"\b\d{9,11}\b"), "[REDACTED_ID]"),
-    (re.compile(r"\b\d{4}\s?\d{4}\s?\d{4}\b"), "[REDACTED_CARD]"),
+    # Spaced groups (e.g. "1234 5678 9012") are card-shaped — require real
+    # separators so contiguous 12-digit UTRs are never touched.
+    (re.compile(r"\b\d{4} \d{4} \d{4}( \d{4})?\b"), "[REDACTED_CARD]"),
     (re.compile(r"(?i)(upi\s*pin|otp|password|pwd)\s*[:=]?\s*\S+"), r"\1=[REDACTED]"),
 ]
 
@@ -27,7 +29,7 @@ def build_complaint_draft(utr: str | None, amount: float | None, ttype: str, tim
         "To: Grievance Officer, [Your Bank/PSP]",
         f"Subject: Dispute — {ttype} UPI transaction UTR {utr or '[UTR]'}",
         "",
-        f"Transaction amount: {amount if amount is not None else '[AMOUNT]'}",
+        f"Transaction amount: {f'{amount:g}' if amount is not None else '[AMOUNT]'}",
         f"Type assessed: {ttype}",
         "",
         "Timeline:",

@@ -29,14 +29,25 @@ def policy_for(triage: TriageResult) -> PolicyFinding:
     )
 
 
+def _human_report(raw: str) -> str:
+    """Strip card-selection JSON, @mentions and key= fragments so the timeline
+    reads like a user report, not protocol exhaust."""
+    import re as _re
+    s = _re.sub(r"\{.*?\}", " ", raw or "")
+    s = _re.sub(r"@\w+", " ", s)
+    s = _re.sub(r"\b(amount|utr|details|track|action)\s*=", " ", s)
+    s = _re.sub(r"\s+", " ", s).strip()
+    return s[:200]
+
+
 def build_pack(triage: TriageResult, policy: PolicyFinding) -> EvidencePack:
-    t = (triage.raw_text or "")[:200]
-    timeline = [f"User report: {redact(t)}"]
+    t = _human_report(triage.raw_text)
+    timeline = [f"User report: {redact(t)}"] if t else ["User report: (see intake details)"]
     if triage.utr:
         timeline.append(f"UTR provided: {triage.utr}")
     if triage.amount is not None:
-        timeline.append(f"Amount: INR {triage.amount}")
-    timeline.append(f"Track: {policy.track} (refund_guaranteed=False)")
+        timeline.append(f"Amount: INR {triage.amount:g}")
+    timeline.append(f"Track: {triage.transaction_type.value} — resolution per official RBI/NPCI timelines (no refund promised)")
     missing = list(triage.missing_fields)
     if triage.transaction_type.value == "unauthorised":
         missing.append("bank acknowledgement + cybercrime ref (1930 / cybercrime.gov.in)")
