@@ -8,12 +8,27 @@ Fetch.ai-native multi-agent payment dispute resolver. Working ASI:One interface,
 **Tracks (not interchangeable):** `failed` ≠ `pending` ≠ `unauthorised` (NPCI guidance).
 
 ## Agents
-- `PayResolve` (agents/orchestrator.py, port 8001) — public ACP entry, Interactive Cards
-  - live address: `agent1q0vj3x8sjdvvpv0elvd0rr60umhkeva8kd9w49pcdqh9zw67wxxrk6yvda6` (your `AGENT_SEED`)
-- `payresolve-triage` (port 8002) — live address: `agent1qwd7l7jv9fzpkej7nq4c8wjxfs8vgw9unddst5q08076yn92k5uy5l043dq`
-- `payresolve-policy` (port 8003) — live address: `agent1qggnj3j4jvz9su2eefhf7l9rprjsccjphjxdan77wmahe9tgtmz5yxppwr7`
-- `payresolve-evidence` (port 8004) — live address: `agent1qvnrqea7eflv2my3szqtn2jdq82uu7dspuguzdgvmnpqf2c2nx70qxd5u79`
-- NOTE: live-seed addresses; keep agents running for ASI:One discovery.
+
+**Hosted (always-on — this is the submitted deployment):**
+- `payresolve-hosted` — public ACP entry, Interactive Cards
+  - address: `agent1qw2ex8clxmdawmj4sfjdjmpskhv7revadhx7dc6tu9k0967t3x8aggg6a28p`
+- `payresolve-triage-hosted` — `agent1qwj64glvt2rdls3u7pyv5n6u5s72ugc0x0m8azvh33kg66u9ahuqvsr8f2m`
+- `payresolve-policy-hosted` — `agent1qwc0h83ft85elyk8y782ltw0gmlsr7cxm92ggm466cdevdpmc0xa2mkdt8y`
+- `payresolve-evidence-hosted` — `agent1qf47wyrenvewcn6sy7apz9ylgfakmwmnrrxguqchytrvxlr9cja8yddwu8v`
+
+**Local (native runtime, full ACP multi-agent topology):**
+- `PayResolve` :8001 — `agent1q0vj3x8sjdvvpv0elvd0rr60umhkeva8kd9w49pcdqh9zw67wxxrk6yvda6`
+- `payresolve-triage` :8002 — `agent1qwd7l7jv9fzpkej7nq4c8wjxfs8vgw9unddst5q08076yn92k5uy5l043dq`
+- `payresolve-policy` :8003 — `agent1qggnj3j4jvz9su2eefhf7l9rprjsccjphjxdan77wmahe9tgtmz5yxppwr7`
+- `payresolve-evidence` :8004 — `agent1qvnrqea7eflv2my3szqtn2jdq82uu7dspuguzdgvmnpqf2c2nx70qxd5u79`
+
+### Why hosted runs consolidated
+Agentverse's hosted wrapper does not register custom message-model schemas
+(`RuntimeError: Unable to determine message model`) and does not inject
+environment variables. So the hosted build runs the full pipeline in-process
+(`DELEGATE_ENABLED=False`, baked by `scripts/build_hosted.py`), while the
+four-agent delegation (`ctx.send_and_receive` → triage/policy/evidence) runs on
+the native uAgent runtime. Both paths share the same deterministic core.
 
 ## Run
 ```
