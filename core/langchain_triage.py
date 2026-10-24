@@ -56,15 +56,33 @@ def _find_utr(text: str) -> str | None:
 
 
 def _find_amount(text: str) -> float | None:
-    mt = re.search(r"(?:rs\.?|inr|₹)\s*([\d,]+(?:\.\d+)?)", (text or "").lower())
-    if not mt:
-        mt = re.search(r"\b([\d,]+(?:\.\d+)?)\b", text or "")
+    low = (text or "").lower()
+    # 1. Explicitly marked amounts win: Rs 2000, INR 2000, ₹2000, amount is 2500.
+    mt = re.search(r"(?:rs\.?|inr|₹|amount(?:\s+is|\s+of|\s*:)?|paid|price|total)\s*([\d,]+(?:\.\d+)?)", low)
     if mt:
         try:
-            return float(mt.group(1).replace(",", ""))
+            return _sane_amount(float(mt.group(1).replace(",", "")))
         except Exception:
-            return None
+            pass
+    # 2. Fallback: first bare number that is NOT a 12-digit UTR run.
+    for m in re.finditer(r"\b([\d,]+(?:\.\d+)?)\b", text or ""):
+        raw = m.group(1).replace(",", "")
+        if re.fullmatch(r"\d{12}", raw):
+            continue  # UTR, not an amount
+        try:
+            return _sane_amount(float(raw))
+        except Exception:
+            continue
     return None
+
+
+def _sane_amount(v: float | None) -> float | None:
+    """Discard implausible UPI amounts (above Rs 1 crore) — misparsed IDs, not money."""
+    if v is None:
+        return None
+    if v > 10_000_000:
+        return None
+    return v
 
 
 def llm_triage(text: str) -> TriageResult:
