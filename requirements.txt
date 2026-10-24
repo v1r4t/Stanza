@@ -1,0 +1,7 @@
+uagents>=0.25.5
+openai
+python-dotenv
+pytest
+langchain-core
+langchain-openai
+uagents-adapter[langchain]
